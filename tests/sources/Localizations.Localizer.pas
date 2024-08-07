@@ -34,12 +34,14 @@ type
 
     function GetLocales: TArray<string>; override;
     function GetResourceValue(const LocaleIndex: Integer;
-      const Locale, GroupName, ResourceName: string): string; override;
+      const Locale,{$IFNDEF USE_DEV_EXPRESS}GroupName,{$ENDIF}ResourceName: string): string; override;
 
     property IsTranslated: Boolean read FTranslated write FTranslated;
   end;
 
+{$IFNDEF USE_DEV_EXPRESS}
 function ResourcesRepository: TStringResourcesRepository;
+{$ENDIF ~ USE_DEV_EXPRESS}
 
 implementation
 
@@ -79,7 +81,7 @@ begin
 end;
 
 function TMockLocalizationsStorage.GetResourceValue(const LocaleIndex: Integer;
-  const Locale, GroupName, ResourceName: string): string;
+  const Locale,{$IFNDEF USE_DEV_EXPRESS}GroupName,{$ENDIF}ResourceName: string): string;
 begin
   if not FTranslated then Exit('');
 
@@ -92,6 +94,7 @@ begin
   Result := '';
 end;
 
+{$IFNDEF USE_DEV_EXPRESS}
 var
   FResourcesRepository: TStringResourcesRepository;
 
@@ -110,5 +113,6 @@ initialization
 
 finalization
   Finalize;
+{$ENDIF ~ USE_DEV_EXPRESS}
 
 end.

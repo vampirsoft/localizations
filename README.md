@@ -26,12 +26,14 @@
 ## Зависимости
 ### Необязательные [1]
 - [QuickLib](https://github.com/exilon/QuickLib)
+- [DevExpress](https://www.devexpress.com/) [2]
 
 ### Обязательные
 - [utils4d](https://github.com/vampirsoft/utils4d)
 - [DUnitX](https://github.com/VSoftTechnologies/DUnitX) (в тестах)
 
 [1] Переключение возможно в [Localizations.inc](/includes/Localizations.inc) с помощью соответствующего ключа (не рекомендуется) или в настройках проекта путём добавления соответствующего ключа
+[2] При использовании каких-либо инструментов из DevExpress эта зависимость становиться обязательной, т.е. обязательно необходимо включить эту зависимость
 
 
 
