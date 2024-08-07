@@ -17,12 +17,14 @@ interface
 
 uses
   System.Math,
+  {$IFDEF USE_DEV_EXPRESS}dxCore,{$ENDIF}
   {$IFDEF USE_QUICK_LIB}Quick.Arrays{$ELSE}Utils.ExtArray{$ENDIF},
   System.Generics.Collections;
 
 type
-  TStringResourceID = Pointer;
+  TStringResourceID = {$IFDEF USE_DEV_EXPRESS}TcxResourceStringID{$ELSE}Pointer{$ENDIF};
 
+{$IFNDEF USE_DEV_EXPRESS}
 { ILocalizerListener }
 
   ILocalizerListener = interface
@@ -89,6 +91,7 @@ type
     procedure AddListener(const Listener: ILocalizerListener); inline;
     procedure RemoveListener(const Listener: ILocalizerListener); inline;
   end;
+{$ENDIF ~ USE_DEV_EXPRESS}
 
 { TLocalizationsStorage }
 
@@ -96,7 +99,7 @@ type
   public
     function GetLocales: TArray<string>; virtual; abstract;
     function GetResourceValue(const LocaleIndex: Integer;
-      const Locale, GroupName, ResourceName: string): string; virtual; abstract;
+      const Locale,{$IFNDEF USE_DEV_EXPRESS}GroupName,{$ENDIF}ResourceName: string): string; virtual; abstract;
   end;
 
 { TLocalizationsManager }
@@ -104,11 +107,15 @@ type
   TLocalizationsManager = class sealed(TEnumerable<string>)
   private type
     TChangeLocaleEvent = procedure(const LocaleIndex: Integer; const Locale: string) of object;
-    TTranslateEvent = function(const Locale, GroupName, ResourceName: string; var Value: string): Boolean of object;
+    TTranslateEvent = function(const LocaleIndex: Integer;
+      const Locale,{$IFNDEF USE_DEV_EXPRESS}GroupName,{$ENDIF}ResourceName: string;
+      var Value: string): Boolean of object;
 
   strict private
     FLocaleIndex: Integer;
+  {$IFNDEF USE_DEV_EXPRESS}
     FRepository: TStringResourcesRepository;
+  {$ENDIF ~ USE_DEV_EXPRESS}
     FStorage: TLocalizationsStorage;
     FLocales: TXArray<string>;
     FOnChangeLocale: TChangeLocaleEvent;
@@ -121,17 +128,25 @@ type
     procedure SetLocaleIndex(const Value: Integer);
 
   strict private
+  {$IFDEF USE_DEV_EXPRESS}
+    procedure OnTranslateResource(const  ResourceName: string; ResourceAddr: TStringResourceID);
+    procedure Translate; inline;
+  {$ELSE ~ USE_DEV_EXPRESS}
     function OnTranslateResource(const Locale, GroupName, ResourceName: string;
       const ResourceAddr: TStringResourceID): Boolean;
-    function DoCustomTranslate(const Locale, GroupName, ResourceName: string; out Value: string): Boolean; inline;
-    function GetLocalizedString(const Locale, GroupName, ResourceName: string; out Value: string): Boolean; inline;
+  {$ENDIF ~ USE_DEV_EXPRESS}
+    function DoCustomTranslate(const Locale,{$IFNDEF USE_DEV_EXPRESS}GroupName,{$ENDIF}ResourceName: string;
+      out Value: string): Boolean; inline;
+    function GetLocalizedString(const Locale,{$IFNDEF USE_DEV_EXPRESS}GroupName,{$ENDIF}ResourceName: string;
+      out Value: string): Boolean; inline;
     procedure DoChangeLocale(const Locale: string); inline;
 
   strict protected
     function DoGetEnumerator: TEnumerator<string>; override;
 
   public
-    constructor Create(const Repository: TStringResourcesRepository; const Storage: TLocalizationsStorage); reintroduce;
+    constructor Create({$IFNDEF USE_DEV_EXPRESS}const Repository: TStringResourcesRepository;{$ENDIF}
+      const Storage: TLocalizationsStorage); reintroduce;
 
   public
     property Locale: string read GetLocale write SetLocale;
@@ -146,6 +161,7 @@ implementation
 uses
   System.SysUtils, System.Generics.Defaults;
 
+{$IFNDEF USE_DEV_EXPRESS}
 { TStringResourcesGroup }
 
 procedure TStringResourcesGroup.AddProcedure(const Proc: TAddStringResourcesProcedure);
@@ -306,13 +322,16 @@ begin
     else FGroups.Remove(GroupName);
   end;
 end;
+{$ENDIF ~ USE_DEV_EXPRESS}
 
 { TLocalizationsManager }
 
-constructor TLocalizationsManager.Create(const Repository: TStringResourcesRepository;
+constructor TLocalizationsManager.Create({$IFNDEF USE_DEV_EXPRESS}const Repository: TStringResourcesRepository;{$ENDIF}
   const Storage: TLocalizationsStorage);
 begin
+{$IFNDEF USE_DEV_EXPRESS}
   FRepository  := Repository;
+{$ENDIF ~ USE_DEV_EXPRESS}
   FStorage     := Storage;
   FLocales     := Storage.GetLocales;
 
@@ -324,16 +343,20 @@ begin
   if Assigned(FOnChangeLocale) then FOnChangeLocale(FLocaleIndex, Locale);
 end;
 
-function TLocalizationsManager.DoCustomTranslate(const Locale, GroupName, ResourceName: string;
-  out Value: string): Boolean;
+function TLocalizationsManager.DoCustomTranslate(
+  const Locale,{$IFNDEF USE_DEV_EXPRESS}GroupName,{$ENDIF}ResourceName: string; out Value: string): Boolean;
 begin
   Result := False;
   if Assigned(FOnTranslate) then
   begin
+  {$IFDEF USE_DEV_EXPRESS}
+    Value := dxResourceStringsRepository.GetOriginalValue(ResourceName);
+  {$ELSE ~ USE_DEV_EXPRESS}
     Value := '';
     const Group = FRepository.GetGroup(GroupName);
     if Assigned(Group) then Value := Group.GetOriginalResourceValue(ResourceName);
-    Result := FOnTranslate(Locale, GroupName, ResourceName, Value);
+  {$ENDIF ~ USE_DEV_EXPRESS}
+    Result := FOnTranslate(FLocaleIndex, Locale,{$IFNDEF USE_DEV_EXPRESS}GroupName,{$ENDIF}ResourceName, Value);
   end;
 end;
 
@@ -353,24 +376,36 @@ begin
   Result := FLocales.Count;
 end;
 
-function TLocalizationsManager.GetLocalizedString(const Locale, GroupName, ResourceName: string;
-  out Value: string): Boolean;
+function TLocalizationsManager.GetLocalizedString(
+  const Locale,{$IFNDEF USE_DEV_EXPRESS}GroupName,{$ENDIF}ResourceName: string; out Value: string): Boolean;
 begin
-  Value := FStorage.GetResourceValue(FLocaleIndex, Locale, GroupName, ResourceName);
+  Value := FStorage.GetResourceValue(FLocaleIndex, Locale,{$IFNDEF USE_DEV_EXPRESS}GroupName,{$ENDIF}ResourceName);
   Result := Value <> '';
 end;
 
+{$IFDEF USE_DEV_EXPRESS}
+procedure TLocalizationsManager.OnTranslateResource(const ResourceName: string; ResourceAddr: TStringResourceID);
+{$ELSE ~ USE_DEV_EXPRESS}
 function TLocalizationsManager.OnTranslateResource(const Locale, GroupName, ResourceName: string;
   const ResourceAddr: TStringResourceID): Boolean;
+{$ENDIF ~ USE_DEV_EXPRESS}
 var
   LocalizedValue: string;
 
 begin
-  Result :=
-    DoCustomTranslate(Locale, GroupName, ResourceName, LocalizedValue) or
-    GetLocalizedString(Locale, GroupName, ResourceName, LocalizedValue);
+{$IFDEF USE_DEV_EXPRESS}
+  const Locale = Self.Locale;
+{$ENDIF ~ USE_DEV_EXPRESS}
+{$IFDEF USE_DEV_EXPRESS}var{$ENDIF}Result :=
+    DoCustomTranslate(Locale,{$IFNDEF USE_DEV_EXPRESS}GroupName,{$ENDIF}ResourceName, LocalizedValue) or
+    GetLocalizedString(Locale,{$IFNDEF USE_DEV_EXPRESS}GroupName,{$ENDIF}ResourceName, LocalizedValue);
 
-  if Result then FRepository.SetResourceValue(ResourceAddr, LocalizedValue);
+  if Result then
+  {$IFDEF USE_DEV_EXPRESS}
+    cxSetResourceString(ResourceAddr, LocalizedValue);
+  {$ELSE ~ USE_DEV_EXPRESS}
+    FRepository.SetResourceValue(ResourceAddr, LocalizedValue);
+  {$ENDIF ~ USE_DEV_EXPRESS}
 end;
 
 procedure TLocalizationsManager.SetLocale(const Value: string);
@@ -384,15 +419,34 @@ begin
   if FLocaleIndex <> Index then
   begin
     FLocaleIndex := Index;
-
+  {$IFDEF USE_DEV_EXPRESS}
+    cxClearResourceStrings;
+  {$ELSE ~ USE_DEV_EXPRESS}
     FRepository.ClearResourceValues;
+  {$ENDIF ~ USE_DEV_EXPRESS}
     const Locale = Self.Locale;
+    DoChangeLocale(Locale);
     if Locale <> '' then
     begin
-      DoChangeLocale(Locale);
+    {$IFDEF USE_DEV_EXPRESS}
+      Translate;
+    {$ELSE ~ USE_DEV_EXPRESS}
       if FRepository.TranslateResources(Locale, OnTranslateResource) then FRepository.NotifyListeners;
+    {$ENDIF ~ USE_DEV_EXPRESS}
     end;
   end;
 end;
+
+{$IFDEF USE_DEV_EXPRESS}
+procedure TLocalizationsManager.Translate;
+begin
+  const PreviousHandler = dxResourceStringsRepository.OnTranslateResString;
+  dxResourceStringsRepository.OnTranslateResString := OnTranslateResource;
+  dxResourceStringsRepository.Translate;
+  dxResourceStringsRepository.OnTranslateResString := PreviousHandler;
+
+  dxResourceStringsRepository.NotifyListeners;
+end;
+{$ENDIF ~ USE_DEV_EXPRESS}
 
 end.

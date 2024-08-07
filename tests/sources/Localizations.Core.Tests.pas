@@ -37,7 +37,9 @@ type
     procedure TearDown;
 
     [Test]
+  {$IFNDEF USE_DEV_EXPRESS}
     [TestCase('should not notify listeners if no localizations', 'False, 0')]
+  {$ENDIF ~ USE_DEV_EXPRESS}
     [TestCase('should notify listeners if has localizations', 'True, 1')]
     procedure switch_locale(const IsTranslated: Boolean; const InvokeCount: Integer);
 
@@ -51,13 +53,15 @@ implementation
 
 uses
   System.SysUtils,
+  {$IFDEF USE_DEV_EXPRESS}dxCore,{$ENDIF}
   Localizations.Resources;
 
 type
 
 { TLocalizerListenerMock }
 
-  TLocalizerListenerMock = class(TInterfacedObject, ILocalizerListener)
+  TLocalizerListenerMock = class(TInterfacedObject,
+    {$IFDEF USE_DEV_EXPRESS}IdxLocalizerListener{$ELSE}ILocalizerListener{$ENDIF})
   public
     FInvokeCount: Integer;
 
@@ -100,31 +104,51 @@ begin
   end;
 
   FLocalizationsManager.LocaleIndex := LocaleIndex;
-  AssertProcedure(sTestResourceStringTwo, ResourcesRepository.GetResourceValue(@sTestResourceStringTwo));
+  AssertProcedure(
+    sTestResourceStringTwo,
+  {$IFDEF USE_DEV_EXPRESS}
+    cxGetResourceString(@sTestResourceStringTwo)
+  {$ELSE ~ USE_DEV_EXPRESS}
+    ResourcesRepository.GetResourceValue(@sTestResourceStringTwo)
+  {$ENDIF USE_DEV_EXPRESS}
+  );
 end;
 
 procedure TLocalizerTests.SetUp;
 begin
   FLocalizationsStorage := TMockLocalizationsStorage.Create;
-  FLocalizationsManager := TLocalizationsManager.Create(ResourcesRepository, FLocalizationsStorage);
+  FLocalizationsManager :=
+    TLocalizationsManager.Create({$IFNDEF USE_DEV_EXPRESS}ResourcesRepository,{$ENDIF}FLocalizationsStorage);
 end;
 
 procedure TLocalizerTests.switch_locale(const IsTranslated: Boolean; const InvokeCount: Integer);
 begin
   const LocalizerListenerMock = TLocalizerListenerMock.Create;
+{$IFDEF USE_DEV_EXPRESS}
+  dxResourceStringsRepository.AddListener(LocalizerListenerMock);
+{$ELSE ~ USE_DEV_EXPRESS}
   ResourcesRepository.AddListener(LocalizerListenerMock);
+{$ENDIF ~ USE_DEV_EXPRESS}
 
   FLocalizationsStorage.IsTranslated := IsTranslated;
   FLocalizationsManager.LocaleIndex := 1;
 
   Assert.AreEqual(InvokeCount, LocalizerListenerMock.FInvokeCount);
 
+{$IFDEF USE_DEV_EXPRESS}
+  dxResourceStringsRepository.RemoveListener(LocalizerListenerMock);
+{$ELSE ~ USE_DEV_EXPRESS}
   ResourcesRepository.RemoveListener(LocalizerListenerMock);
+{$ENDIF ~ USE_DEV_EXPRESS}
 end;
 
 procedure TLocalizerTests.TearDown;
 begin
+{$IFDEF USE_DEV_EXPRESS}
+  cxClearResourceStrings;
+{$ELSE ~ USE_DEV_EXPRESS}
   ResourcesRepository.ClearResourceValues;
+{$ENDIF ~ USE_DEV_EXPRESS}
   FreeAndNil(FLocalizationsManager);
   FreeAndNil(FLocalizationsStorage);
 end;
