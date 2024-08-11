@@ -37,9 +37,6 @@ type
     procedure TearDown;
 
     [Test]
-  {$IFNDEF USE_DEV_EXPRESS}
-    [TestCase('should not notify listeners if no localizations', 'False, 0')]
-  {$ENDIF ~ USE_DEV_EXPRESS}
     [TestCase('should notify listeners if has localizations', 'True, 1')]
     procedure switch_locale(const IsTranslated: Boolean; const InvokeCount: Integer);
 
