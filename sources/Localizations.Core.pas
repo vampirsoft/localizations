@@ -37,8 +37,8 @@ type
   TStringResourcesGroup = class sealed
   private type
     TAddStringResourcesProcedure = reference to procedure(const StringResources: TStringResourcesGroup);
-    TTranslateResourceEvent = function(const Locale, GroupName, ResourceName: string;
-      const ResourceAddr: TStringResourceID): Boolean of object;
+    TTranslateResourceEvent = procedure(const Locale, GroupName, ResourceName: string;
+      const ResourceAddr: TStringResourceID) of object;
 
   strict private
     FName: string;
@@ -50,7 +50,7 @@ type
     function GetResourceAddr(const ResourceName: string): TStringResourceID; inline;
     function GetOriginalResourceValue(const ResourceName: string): string; inline;
     function GetProcedureCount: Integer; inline;
-    function Translate(const Locale: string; const TranslateResource: TTranslateResourceEvent): Boolean; inline;
+    procedure Translate(const Locale: string; const TranslateResource: TTranslateResourceEvent); inline;
     procedure AddProcedure(const Proc: TAddStringResourcesProcedure); inline;
     procedure RemoveProcedure(const Proc: TAddStringResourcesProcedure); inline;
 
@@ -72,8 +72,8 @@ type
 
   private
     function GetGroup(const GroupName: string): TStringResourcesGroup; inline;
-    function TranslateResources(const Locale: string;
-      const TranslateResource: TStringResourcesGroup.TTranslateResourceEvent): Boolean; inline;
+    procedure TranslateResources(const Locale: string;
+      const TranslateResource: TStringResourcesGroup.TTranslateResourceEvent); inline;
     procedure SetResourceValue(const ResourceAddr: TStringResourceID; const Value: string); inline;
     procedure NotifyListeners; inline;
 
@@ -132,8 +132,8 @@ type
     procedure OnTranslateResource(const  ResourceName: string; ResourceAddr: TStringResourceID);
     procedure Translate; inline;
   {$ELSE ~ USE_DEV_EXPRESS}
-    function OnTranslateResource(const Locale, GroupName, ResourceName: string;
-      const ResourceAddr: TStringResourceID): Boolean;
+    procedure OnTranslateResource(const Locale, GroupName, ResourceName: string; const ResourceAddr: TStringResourceID);
+    procedure Translate(const Locale: string); inline;
   {$ENDIF ~ USE_DEV_EXPRESS}
     function DoCustomTranslate(const Locale,{$IFNDEF USE_DEV_EXPRESS}GroupName,{$ENDIF}ResourceName: string;
       out Value: string): Boolean; inline;
@@ -158,10 +158,10 @@ type
 
 implementation
 
+{$IFNDEF USE_DEV_EXPRESS}
 uses
   System.SysUtils, System.Generics.Defaults;
 
-{$IFNDEF USE_DEV_EXPRESS}
 { TStringResourcesGroup }
 
 procedure TStringResourcesGroup.AddProcedure(const Proc: TAddStringResourcesProcedure);
@@ -218,13 +218,11 @@ begin
   FProcedures.Remove(Proc);
 end;
 
-function TStringResourcesGroup.Translate(const Locale: string;
-  const TranslateResource: TTranslateResourceEvent): Boolean;
+procedure TStringResourcesGroup.Translate(const Locale: string; const TranslateResource: TTranslateResourceEvent);
 begin
-  Result := False;
   for var Resource in FResources do
   begin
-    Result := TranslateResource(Locale, FName, Resource.Key, Resource.Value);
+    TranslateResource(Locale, FName, Resource.Key, Resource.Value);
   end;
 end;
 
@@ -298,13 +296,12 @@ begin
   FResourceValues.Add(ResourceAddr, Value);
 end;
 
-function TStringResourcesRepository.TranslateResources(const Locale: string;
-  const TranslateResource: TStringResourcesGroup.TTranslateResourceEvent): Boolean;
+procedure TStringResourcesRepository.TranslateResources(const Locale: string;
+  const TranslateResource: TStringResourcesGroup.TTranslateResourceEvent);
 begin
-  Result := False;
   for var Group in FGroups.Values do
   begin
-    Result := Group.Translate(Locale, TranslateResource);
+    Group.Translate(Locale, TranslateResource);
   end;
 end;
 
@@ -386,8 +383,8 @@ end;
 {$IFDEF USE_DEV_EXPRESS}
 procedure TLocalizationsManager.OnTranslateResource(const ResourceName: string; ResourceAddr: TStringResourceID);
 {$ELSE ~ USE_DEV_EXPRESS}
-function TLocalizationsManager.OnTranslateResource(const Locale, GroupName, ResourceName: string;
-  const ResourceAddr: TStringResourceID): Boolean;
+procedure TLocalizationsManager.OnTranslateResource(const Locale, GroupName, ResourceName: string;
+  const ResourceAddr: TStringResourceID);
 {$ENDIF ~ USE_DEV_EXPRESS}
 var
   LocalizedValue: string;
@@ -396,7 +393,7 @@ begin
 {$IFDEF USE_DEV_EXPRESS}
   const Locale = Self.Locale;
 {$ENDIF ~ USE_DEV_EXPRESS}
-{$IFDEF USE_DEV_EXPRESS}var{$ENDIF}Result :=
+  const Result =
     DoCustomTranslate(Locale,{$IFNDEF USE_DEV_EXPRESS}GroupName,{$ENDIF}ResourceName, LocalizedValue) or
     GetLocalizedString(Locale,{$IFNDEF USE_DEV_EXPRESS}GroupName,{$ENDIF}ResourceName, LocalizedValue);
 
@@ -419,33 +416,33 @@ begin
   if FLocaleIndex <> Index then
   begin
     FLocaleIndex := Index;
-  {$IFDEF USE_DEV_EXPRESS}
-    cxClearResourceStrings;
-  {$ELSE ~ USE_DEV_EXPRESS}
-    FRepository.ClearResourceValues;
-  {$ENDIF ~ USE_DEV_EXPRESS}
+
     const Locale = Self.Locale;
     DoChangeLocale(Locale);
-    if Locale <> '' then
-    begin
-    {$IFDEF USE_DEV_EXPRESS}
-      Translate;
-    {$ELSE ~ USE_DEV_EXPRESS}
-      if FRepository.TranslateResources(Locale, OnTranslateResource) then FRepository.NotifyListeners;
-    {$ENDIF ~ USE_DEV_EXPRESS}
-    end;
+    Translate{$IFNDEF USE_DEV_EXPRESS}(Locale){$ENDIF};
   end;
 end;
 
 {$IFDEF USE_DEV_EXPRESS}
 procedure TLocalizationsManager.Translate;
 begin
+  cxClearResourceStrings;
+
   const PreviousHandler = dxResourceStringsRepository.OnTranslateResString;
   dxResourceStringsRepository.OnTranslateResString := OnTranslateResource;
   dxResourceStringsRepository.Translate;
   dxResourceStringsRepository.OnTranslateResString := PreviousHandler;
 
   dxResourceStringsRepository.NotifyListeners;
+end;
+{$ELSE ~ USE_DEV_EXPRESS}
+procedure TLocalizationsManager.Translate(const Locale: string);
+begin
+  FRepository.ClearResourceValues;
+
+  FRepository.TranslateResources(Locale, OnTranslateResource);
+
+  FRepository.NotifyListeners;
 end;
 {$ENDIF ~ USE_DEV_EXPRESS}
 
