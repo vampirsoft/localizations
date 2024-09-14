@@ -71,11 +71,11 @@ begin
     //We don't want this happening when running under CI.
     TDUnitX.Options.ExitBehavior := TDUnitXExitBehavior.Pause;
     System.Write('Done... press <Enter> key to quit.');
-    System.Readln;
   except
     on E: Exception do
       System.Writeln(E.ClassName, ': ', E.Message);
   end;
+  System.Readln;
 {$ENDIF CONSOLE_TESTRUNNER}
 {$IFDEF USE_VCL_TESTRUNNER}
   Application.Initialize;
